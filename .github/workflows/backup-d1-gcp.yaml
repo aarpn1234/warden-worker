@@ -2,8 +2,8 @@ name: Backup D1 Database to GCP
 
 on:
   schedule:
-    - cron: "0 3 * * *" # UTC 04:00
-
+    - cron: "0 4 * * *"
+  workflow_dispatch:
 env:
   BACKUP_RETENTION_DAYS: 30
 
