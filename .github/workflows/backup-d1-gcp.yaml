@@ -66,11 +66,10 @@ jobs:
       # ------------------------------------------------------
       # Google Cloud authentication
       # ------------------------------------------------------
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
@@ -101,7 +100,6 @@ jobs:
           echo "Cleaning up backups older than $CUTOFF_DATE..."
 
           gsutil ls -l "gs://$GCS_BUCKET/" | while read -r SIZE DATETIME FILENAME; do
-            # Skip TOTAL line and empty lines
             if [[ "$SIZE" == "TOTAL" ]] || [[ -z "$FILENAME" ]]; then
               continue
             fi
