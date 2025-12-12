@@ -17,7 +17,7 @@ name = "LOGIN_RATE_LIMITER"
 namespace_id = "1001"
 # Allow 5 requests per 60 seconds per key (email or IP)
 # This prevents brute force attacks while allowing legitimate login attempts
-simple = { limit = 5, period = 60 }
+simple = { limit = 5, period = 10 }
 
 # Static assets configuration for serving frontend
 # Frontend files should be placed in ./public directory before deployment
