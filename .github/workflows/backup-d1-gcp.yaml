@@ -94,20 +94,32 @@ jobs:
       - name: Clean up old backups in GCP Cloud Storage
         env:
           GCS_BUCKET: ${{ secrets.GCS_BUCKET }}
+          BACKUP_RETENTION_DAYS: ${{ env.BACKUP_RETENTION_DAYS }}
         run: |
           CUTOFF_DATE=$(date -d "-${BACKUP_RETENTION_DAYS} days" +%Y-%m-%d)
-          echo "Cleaning up backups older than $CUTOFF_DATE..."
+          echo "Cleaning up backups older than $CUTOFF_DATE (retention: ${BACKUP_RETENTION_DAYS} days)..."
 
-          gsutil ls -l "gs://$GCS_BUCKET/" | while read -r SIZE DATETIME FILENAME; do
-            if [[ "$SIZE" == "TOTAL" ]] || [[ -z "$FILENAME" ]]; then
-              continue
-            fi
-
-            FILE_DATE=$(echo "$DATETIME" | cut -dT -f1)
-
-            if [[ "$FILE_DATE" < "$CUTOFF_DATE" ]]; then
-              echo "Deleting old backup: $FILENAME (date: $FILE_DATE)"
-              gsutil rm "$FILENAME"
+          # 列出所有符合条件的备份文件
+          for file_url in $(gsutil ls "gs://$GCS_BUCKET/vault1_prod_*.sql.gz*"); do
+            if [[ -n "$file_url" && "$file_url" != *"TOTAL"* ]]; then
+              # 获取文件名并从中提取日期
+              filename=$(basename "$file_url")
+              
+              # 从文件名中提取日期部分 (格式: vault1_prod_YYYY-MM-DD_HH-MM-SS.sql.gz.enc)
+              file_date_part=$(echo "$filename" | sed 's/vault1_prod_\([0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}\).*/\1/')
+              
+              # 验证提取的日期格式是否正确
+              if [[ "$file_date_part" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+                # 比较日期
+                if [[ "$file_date_part" < "$CUTOFF_DATE" ]]; then
+                  echo "Deleting old backup: $file_url (date: $file_date_part)"
+                  gsutil rm "$file_url"
+                else
+                  echo "Keeping backup: $filename (date: $file_date_part)"
+                fi
+              else
+                echo "Skipping file with unrecognized date format: $filename"
+              fi
             fi
           done
 
