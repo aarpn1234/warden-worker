@@ -5,16 +5,13 @@ on:
     - cron: "0 4 * * *"
   workflow_dispatch:
 
-env:
-  BACKUP_RETENTION_DAYS: 3
-
 jobs:
   backup-production:
     name: Backup Production D1 Database
     runs-on: ubuntu-latest
 
     steps:
-      # 必须：给 gh CLI 提供仓库上下文
+      # 给 gh CLI 提供仓库上下文（必须）
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -49,7 +46,6 @@ jobs:
             --output=backup.sql
 
           gzip backup.sql
-          echo "backup.sql.gz created"
 
       - name: Encrypt backup (required)
         id: encrypted
@@ -80,21 +76,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete old backup releases
+      - name: Delete old backup releases (keep latest 3)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🧹 Cleaning backup releases older than $BACKUP_RETENTION_DAYS days..."
+          KEEP=3
+          echo "🧹 Keeping latest $KEEP backup releases..."
 
           gh release list --limit 100 --json name,createdAt |
-          jq -r '.[] | select(.name | startswith("Backup ")) | "\(.name) \(.createdAt)"' |
-          while read name created; do
-            created_ts=$(date -d "$created" +%s)
-            now_ts=$(date +%s)
-            age_days=$(( (now_ts - created_ts) / 86400 ))
-
-            if [ "$age_days" -ge "$BACKUP_RETENTION_DAYS" ]; then
-              echo "🗑️ Deleting $name (age: ${age_days}d)"
-              gh release delete "$name" -y
-            fi
+          jq -r '
+            map(select(.name | startswith("Backup "))) |
+            sort_by(.createdAt) |
+            reverse |
+            .['"$KEEP"':] |
+            .[] |
+            .name
+          ' |
+          while read -r name; do
+            echo "🗑️ Deleting old backup release: $name"
+            gh release delete "$name" -y
           done
